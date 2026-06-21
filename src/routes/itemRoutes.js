@@ -68,7 +68,20 @@ router.get('/', async (req, res) => {
     if (Number.isNaN(page) || page < 1) page = 1;
     if (Number.isNaN(limit) || limit < 1) limit = 20;
 
+    const collection = getItemsCollection();
+
+    const from = (page - 1) * limit;
+
+    let sortOption;
+    if (sort === 'createdAt') {
+      sortOption = { createdAt: -1 };
+    } else {
+      // sort === 'relevance'
+      sortOption = { frequency: 1, createdAt: -1 };
+    }
+
     const filters = {};
+
     if (query) {
       filters.content = { $regex: query, $options: 'i' };
     }
@@ -77,21 +90,8 @@ router.get('/', async (req, res) => {
       filters.uniquenessTag = uniquenessTag;
     }
 
-    const from = (page - 1) * limit;
-
-    let sortOption;
-    if (sort === 'createdAt') {
-      sortOption = { createdAt: -1 };
-    } else if (sort === 'relevance') {
-      // Sort first by frequency ascending, then createdAt descending
-      // Also filter by uniquenessTag if provided
-      sortOption = { frequency: 1, createdAt: -1 };
-    }
-
-    const collection = getItemsCollection();
-
     if (sort === 'relevance') {
-      // Use aggregation pipeline to support pagination and filtering
+      // aggregation pipeline
       const pipeline = [];
       if (Object.keys(filters).length > 0) {
         pipeline.push({ $match: filters });
@@ -104,7 +104,7 @@ router.get('/', async (req, res) => {
       const items = await collection.aggregate(pipeline).toArray();
       return res.json({ items, page, limit });
     } else {
-      // Normal find for createdAt sorting
+      // sort === 'createdAt'
       const cursor = collection.find(filters).sort(sortOption).skip(from).limit(limit);
       const items = await cursor.toArray();
       return res.json({ items, page, limit });
@@ -120,20 +120,17 @@ router.get('/stats', async (req, res) => {
   try {
     const collection = getItemsCollection();
 
-    // Aggregate by hash to get per-hash frequency and count
-    // We count 1 per group (because frequency represents how many items share that hash)
-    // totalItems of distinct hashes (total unique content groups)
+    // Aggregate by hash to determine frequencies
     const aggregationPipeline = [
       {
-        // Group by hash to get frequency
         $group: {
           _id: '$hash',
+          count: { $sum: 1 },
           frequency: { $max: '$frequency' },
           createdAt: { $min: '$createdAt' }
         }
       },
       {
-        // Group again to accumulate counts by tag
         $group: {
           _id: null,
           totalHashes: { $sum: 1 },
@@ -160,7 +157,7 @@ router.get('/stats', async (req, res) => {
     const data = aggregationResult[0];
 
     // frequencyGroups is an array of frequencies per unique hash
-    // Build frequency distribution: how many distinct hashes have each frequency
+    // Build frequency distribution: count of hashes by frequency
     const frequencyCountMap = {};
     for (const freq of data.frequencyGroups) {
       const key = String(freq);
