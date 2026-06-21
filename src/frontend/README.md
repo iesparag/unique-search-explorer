@@ -20,6 +20,7 @@ npm run frontend:dev
 
 This will start Vite dev server usually at http://localhost:5173 with hot reload.
 
+
 ## Building for Production
 
 Run the build script from project root:
@@ -29,6 +30,7 @@ npm run frontend:build
 ```
 
 This will build the React app into static files under `src/frontend/dist`.
+
 
 ## Serving in Production
 
@@ -52,7 +54,12 @@ npm start
 
 and visit `http://localhost:3010/` (or your configured port).
 
+
 ## Notes
 
 - The frontend is intentionally minimal for demonstration and can be extended with better styling and features.
 - The frontend communicates with the backend API on the same origin.
+
+- For frontend development, run `npm run frontend:dev` inside `src/frontend` to start a hot reload server at port 5173.
+
+- For backend development with frontend served, build frontend and start backend server.
