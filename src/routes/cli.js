@@ -12,7 +12,7 @@ async function cli() {
         process.exit(1);
       }
 
-      // If invoked like `node src/index.js add "content here"`, treat all args as single content string if no '=' present
+      // If invoked like `node src/index.js add "content here"`, treat as content only
       if (args.length === 1 && !args[0].includes('=')) {
         const contentValue = args[0];
         if (typeof contentValue !== 'string' || !contentValue.trim()) {
@@ -20,39 +20,32 @@ async function cli() {
           process.exit(1);
         }
 
-        // Only content provided, add reasonable defaults (title and source absent)
         const saved = await addOrUpdateItem({ content: contentValue.trim() });
         console.log('Item saved:');
         console.log(JSON.stringify(saved, null, 2));
         process.exit(0);
       }
 
-      // Otherwise parse args like key=value, support simple quoting
+      // Otherwise parse args like key=value
       const itemData = {};
       for (const arg of args) {
-        // Match key=value or key="value with spaces"
         const match = arg.match(/^([a-zA-Z]+)=(.*)$/);
         if (!match) {
           console.error(`Error: Invalid argument format: ${arg}. Expected key=value.`);
           process.exit(1);
         }
         let [, key, value] = match;
-
-        // Remove surrounding quotes if any
-        if ((value.startsWith('"') && value.endsWith('"')) || (value.startsWith("'") && value.endsWith("'"))) {
+        if ((value.startsWith('"') && value.endsWith('"')) || (value.startsWith('\'') && value.endsWith('\''))) {
           value = value.slice(1, -1);
         }
-
         itemData[key] = value;
       }
 
-      // Validate required field content
       if (!itemData.content || typeof itemData.content !== 'string' || !itemData.content.trim()) {
         console.error('Error: Field "content" is required and must be a non-empty string.');
         process.exit(1);
       }
 
-      // Trim strings (content, title, source) if they exist
       if (itemData.content) {
         itemData.content = itemData.content.trim();
       }
@@ -70,7 +63,6 @@ async function cli() {
     }
 
     if (command === 'search-items' || command === 'search') {
-      // Accept optional flags: --query <text>, --onlyUnique, --limit <number>, --page <number>
       let query = '';
       let onlyUnique = false;
       let limit = 20;
@@ -131,7 +123,6 @@ async function cli() {
         for (const item of results) {
           console.log(`- _id: ${item._id}`);
           console.log(`  Content: ${item.content}`);
-          // frequency and uniquenessTag may be missing in some items, provide defaults
           console.log(`  Frequency: ${item.frequency ?? 'N/A'}`);
           console.log(`  UniquenessTag: ${item.uniquenessTag ?? 'N/A'}`);
           if (item.title) console.log(`  Title: ${item.title}`);
@@ -143,7 +134,7 @@ async function cli() {
       process.exit(0);
     }
 
-    // If no recognized command given, print usage
+    // If no command, show usage
     console.log('Unique Search Explorer CLI');
     console.log('Usage:');
     console.log('  add-item content="your content" [title="optional title"] [source="optional source"]');
