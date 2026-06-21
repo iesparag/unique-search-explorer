@@ -17,7 +17,7 @@ const Tags = {
  */
 function getUniquenessTag(frequency) {
   if (frequency === 1) return Tags.UNIQUE;
-  if (frequency <= 5) return Tags.RARE;
+  if (frequency >= 2 && frequency <= 5) return Tags.RARE;
   return Tags.COMMON;
 }
 

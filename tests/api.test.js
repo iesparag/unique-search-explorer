@@ -162,4 +162,53 @@ describe('API Tests', () => {
     const json2 = await resp2.json();
     assert.match(json2.error, /Invalid sort/i);
   });
+
+  test('GET /items/stats returns aggregated uniqueness statistics', async () => {
+    const collection = getItemsCollection();
+    await collection.deleteMany({content: /api test stats/i});
+
+    // Insert items with controlled frequencies
+    // Use addOrUpdateItem for correctness
+    const {addOrUpdateItem} = await import('../src/services/uniquenessService.js');
+
+    // Clear items
+    await collection.deleteMany({content: /api test stats/i});
+
+    // Add 1 unique item (freq=1)
+    await addOrUpdateItem({content: 'api test stats unique item'});
+
+    // Add 3 items for a rare hash (freq=3)
+    await addOrUpdateItem({content: 'api test stats rare item'});
+    await addOrUpdateItem({content: 'api test stats rare item'});
+    await addOrUpdateItem({content: 'api test stats rare item'});
+
+    // Add 6 items for a common hash (freq=6)
+    for (let i = 0; i < 6; i++) {
+      await addOrUpdateItem({content: `api test stats common item ${i}`});
+    }
+
+    // Now query /items/stats
+    const resp = await fetch(baseUrl + '/items/stats');
+    assert.equal(resp.status, 200);
+    const json = await resp.json();
+
+    assert.ok(typeof json.totalItems === 'number');
+    assert.ok(typeof json.UNIQUE === 'number');
+    assert.ok(typeof json.RARE === 'number');
+    assert.ok(typeof json.COMMON === 'number');
+    assert.ok(typeof json.frequencyDistribution === 'object');
+
+    // Check values reasonably
+    assert.ok(json.UNIQUE >= 1);
+    assert.ok(json.RARE >= 3);
+    assert.ok(json.COMMON >= 6);
+    assert.ok(json.totalItems >= 10);
+
+    // Frequency distribution keys includes 1,3,6
+    assert.ok(json.frequencyDistribution['1'] >= 1);
+    assert.ok(json.frequencyDistribution['3'] >= 1);
+    assert.ok(json.frequencyDistribution['6'] >= 1);
+
+    await collection.deleteMany({content: /api test stats/i});
+  });
 });
