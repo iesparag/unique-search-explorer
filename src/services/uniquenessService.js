@@ -48,31 +48,31 @@ export async function addOrUpdateItem(itemData) {
 
   const now = new Date();
 
-  // Find item count with this hash (exact number of documents sharing this hash)
-  const count = await collection.countDocuments({hash});
+  // Find all items with this hash
+  const existingItems = await collection.find({hash}).toArray();
+  const count = existingItems.length;
 
   if (count > 0) {
-    // Current frequency is count + 1 (including the new item)
+    // New frequency is count + 1 (including the new item we're adding)
     const newFrequency = count + 1;
     const tag = getUniquenessTag(newFrequency);
 
-    // Update frequency, uniquenessTag and lastSeen for all items with this hash
+    // Update frequency, uniquenessTag and lastSeen for all existing items with this hash
     await collection.updateMany(
       {hash},
       { $set: { frequency: newFrequency, lastSeen: now, uniquenessTag: tag } }
     );
 
-    // Return new item with updated frequency
-    // Fetch createdAt from an existing item for consistency
-    const existingItem = await collection.findOne({hash}, { projection: { createdAt: 1 } });
-
+    // Return new item representation with frequency info
+    // createdAt should be now because this is a new item with this hash
     return {
       ...itemData,
+      content: contentTrimmed,
       hash,
       frequency: newFrequency,
       uniquenessTag: tag,
-      createdAt: existingItem?.createdAt || now,
-      lastSeen: now,
+      createdAt: now,
+      lastSeen: now
     };
   }
 
@@ -117,6 +117,7 @@ export async function searchItems({query = '', onlyUnique = false, limit = 20, p
     filters.content = { $regex: query, $options: 'i' };
   }
 
+  // onlyUnique and uniquenessTag both filter same
   if (onlyUnique) {
     filters.frequency = 1;
   }
