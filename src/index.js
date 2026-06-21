@@ -4,6 +4,12 @@ import itemRoutes from './routes/itemRoutes.js';
 import {initializeDb} from './models/item.js';
 import cli from './routes/cli.js';
 import process from 'process';
+import path from 'path';
+import {fileURLToPath} from 'url';
+import {dirname} from 'path';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
 
 async function startServer() {
   await initializeDb(config.mongodbUri);
@@ -11,12 +17,27 @@ async function startServer() {
   const app = express();
   app.use(express.json());
 
+  // API routes
   app.use('/items', itemRoutes);
 
+  // Serve the frontend static files
+  // Frontend build output location
+  const frontendDistPath = path.join(__dirname, 'frontend', 'dist');
+
+  // Serve static files from frontend dist
+  app.use(express.static(frontendDistPath));
+
+  // Serve index.html for root and for other frontend routes
   app.get('/', (req, res) => {
-    res.send('Unique Search Explorer API');
+    res.sendFile(path.join(frontendDistPath, 'index.html'));
   });
 
+  // Fallback route to handle SPA (serve index.html)
+  app.get('*', (req, res) => {
+    res.sendFile(path.join(frontendDistPath, 'index.html'));
+  });
+
+  // Not found handler for other paths under /items or unknown
   app.use((req, res) => {
     res.status(404).json({error: 'Not found'});
   });
