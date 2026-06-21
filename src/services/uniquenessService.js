@@ -23,7 +23,8 @@ function getUniquenessTag(frequency) {
 
 /**
  * Adds an item to the database, computes hash to find uniqueness.
- * If an item with the same hash exists, increments its frequency.
+ * If an item with the same hash exists, increments frequency of all such items.
+ * If no existing, inserts new item with frequency = 1.
  * Updates uniquenessTag for all items with the hash accordingly.
  * Returns the saved or updated item.
  *
@@ -47,21 +48,23 @@ export async function addOrUpdateItem(itemData) {
 
   const now = new Date();
 
-  // Check if there is any item with the same hash
-  const existing = await collection.findOne({hash});
+  // Find all items with this hash
+  const itemsWithHash = await collection.find({hash}).toArray();
 
-  if (existing) {
-    // There is already an item with the same hash
-    // We will increment frequency for all such items
-    // and update lastSeen
+  if (itemsWithHash.length > 0) {
+    // There are existing items with the same hash
+    // Increment frequency for all such items
+    const currentFrequency = itemsWithHash[0].frequency || 1;
+    const newFrequency = currentFrequency + 1;
+
+    // Update frequency and lastSeen for all items with this hash
     await collection.updateMany(
       {hash},
-      { $inc: { frequency: 1 }, $set: { lastSeen: now } }
+      { $set: { frequency: newFrequency, lastSeen: now } }
     );
 
-    // Now get updated frequency (all items share frequency, so get one)
-    const updatedItem = await collection.findOne({hash});
-    const tag = getUniquenessTag(updatedItem.frequency);
+    // Determine new uniquenessTag
+    const tag = getUniquenessTag(newFrequency);
 
     // Update uniquenessTag for all items with this hash
     await collection.updateMany(
@@ -69,13 +72,13 @@ export async function addOrUpdateItem(itemData) {
       { $set: { uniquenessTag: tag } }
     );
 
-    // Return updated frequency and tag
+    // Return updated item info (based on first existing item data)
     return {
       ...itemData,
       hash,
-      frequency: updatedItem.frequency, // after increment
+      frequency: newFrequency,
       uniquenessTag: tag,
-      createdAt: existing.createdAt,
+      createdAt: itemsWithHash[0].createdAt,
       lastSeen: now,
     };
   }
@@ -119,7 +122,7 @@ export async function searchItems({query = '', onlyUnique = false, limit = 20} =
   }
 
   if (onlyUnique) {
-    // only frequency 1 needed, uniquenessTag UNIQUE maybe or frequency 1 is simpler
+    // only frequency 1 needed
     filters.frequency = 1;
   }
 
