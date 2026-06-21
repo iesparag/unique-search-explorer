@@ -34,7 +34,12 @@ tests/         # Automated tests
    cd unique-search-explorer
    ```
 
-2. Create a `.env` file based on `.env.example` and configure your environment variables.
+2. Create a `.env` file in the project root with the following production settings for deployment (for example on Vercel):
+
+   ```dotenv
+   MONGODB_URI=mongodb+srv://iesparagjain:iesparagjain@cluster0.boltvzz.mongodb.net/
+   PORT=3010
+   ```
 
 3. Install dependencies:
    ```bash
@@ -56,7 +61,8 @@ tests/         # Automated tests
 | Variable    | Description                           | Example                              |
 |-------------|-------------------------------------|------------------------------------|
 | MONGODB_URI | MongoDB connection URI               | mongodb://localhost:27017/unique_search_explorer |
-| PORT        | Port for Express.js server           | 3000                               |
+| PORT        | Port for Express.js server           | 3000 (Default), use 3010 in production |
+
 
 ## Usage Examples
 
@@ -65,7 +71,7 @@ tests/         # Automated tests
 - **Add a new item**
 
   ```bash
-  curl -X POST http://localhost:3000/items \
+  curl -X POST http://localhost:3010/items \
     -H 'Content-Type: application/json' \
     -d '{"content":"Unique item content","title":"Sample Title","source":"API Example"}'
   ```
@@ -89,7 +95,7 @@ tests/         # Automated tests
   Fetch items matching a query, optionally filtering by uniqueness tag and sorting.
 
   ```bash
-  curl http://localhost:3000/items?query=unique&uniquenessTag=UNIQUE&sort=createdAt&page=1&limit=10
+  curl http://localhost:3010/items?query=unique&uniquenessTag=UNIQUE&sort=createdAt&page=1&limit=10
   ```
 
   Response will contain matched items with pagination.
@@ -97,7 +103,7 @@ tests/         # Automated tests
 - **Get aggregated statistics**
 
   ```bash
-  curl http://localhost:3000/items/stats
+  curl http://localhost:3010/items/stats
   ```
 
   Response provides counts for unique, rare, common items, and frequency distribution.
@@ -150,10 +156,16 @@ When new items are added that share content, the system updates frequency counts
 ## Troubleshooting Tips
 
 - **Database connection issues:** Ensure `MONGODB_URI` is correctly set and MongoDB server is running.
-- **Port in use:** The configured `PORT` might be in use. Change it in `.env`.
+- **Port in use:** The configured `PORT` might be in use. Change it in `.env` if needed.
 - **Duplicate item errors:** Duplicate content generates a hash conflict handled gracefully when adding. Use unique content or update existing.
 - **Tests failing:** Verify MongoDB is reachable and environment variables are correct.
 - **CLI errors:** Ensure you use correct argument formats: key=value pairs or positional content argument.
+
+## Deployment on Vercel
+
+- The `.env` file as specified should be used for local development and can be replicated using [Vercel Environment Variables](https://vercel.com/docs/environment-variables) in Vercel dashboard.
+- Vercel deployment will pick up the `PORT` environment variable; however, Vercel dynamically assigns ports. The included server code uses `process.env.PORT` which matches best practice for Vercel.
+- Vercel supports Node.js 20+ and Express apps; this project is compatible as-is.
 
 ## License
 
