@@ -53,26 +53,22 @@ export async function addOrUpdateItem(itemData) {
 
   if (itemsWithHash.length > 0) {
     // There are existing items with the same hash
-    // Increment frequency for all such items
-    const currentFrequency = itemsWithHash[0].frequency || 1;
+    // New frequency is existing frequency + 1
+    // But existing items may have different frequencies if data happened inconsistent
+    // Recalculate new frequency as old frequency + 1
+
+    // Find max frequency recorded among items
+    const currentFrequency = Math.max(...itemsWithHash.map(i => i.frequency || 1));
     const newFrequency = currentFrequency + 1;
 
-    // Update frequency and lastSeen for all items with this hash
-    await collection.updateMany(
-      {hash},
-      { $set: { frequency: newFrequency, lastSeen: now } }
-    );
-
-    // Determine new uniquenessTag
+    // Update frequency, uniquenessTag and lastSeen for all items with this hash
     const tag = getUniquenessTag(newFrequency);
-
-    // Update uniquenessTag for all items with this hash
     await collection.updateMany(
       {hash},
-      { $set: { uniquenessTag: tag } }
+      { $set: { frequency: newFrequency, lastSeen: now, uniquenessTag: tag } }
     );
 
-    // Return updated item info (based on first existing item data)
+    // Return new item data with updated frequency
     return {
       ...itemData,
       hash,
@@ -110,9 +106,12 @@ export async function addOrUpdateItem(itemData) {
  * @param {string} params.query - text to match in content (optional)
  * @param {boolean} params.onlyUnique - if true, return only items with frequency 1
  * @param {number} params.limit - number of items to return
+ * @param {number} params.page - page number for pagination (optional, default 1)
+ * @param {string|null} params.uniquenessTag - filter by uniquenessTag (optional)
+ * @param {string} params.sort - 'createdAt' or 'relevance' (optional)
  * @returns {Array} items matching criteria
  */
-export async function searchItems({query = '', onlyUnique = false, limit = 20} = {}) {
+export async function searchItems({query = '', onlyUnique = false, limit = 20, page = 1, uniquenessTag = null, sort = 'createdAt'} = {}) {
   const collection = getItemsCollection();
 
   const filters = {};
@@ -122,12 +121,41 @@ export async function searchItems({query = '', onlyUnique = false, limit = 20} =
   }
 
   if (onlyUnique) {
-    // only frequency 1 needed
     filters.frequency = 1;
   }
 
-  const cursor = collection.find(filters).sort({createdAt: -1}).limit(limit);
+  if (uniquenessTag != null) {
+    filters.uniquenessTag = uniquenessTag;
+  }
 
-  const results = await cursor.toArray();
-  return results;
+  const from = (page - 1) * limit;
+
+  let sortOption = {};
+  if (sort === 'createdAt') {
+    sortOption = { createdAt: -1 };
+  } else if (sort === 'relevance') {
+    // frequency asc, then createdAt desc
+    sortOption = { frequency: 1, createdAt: -1 };
+  } else {
+    sortOption = { createdAt: -1 };
+  }
+
+  if (sort === 'relevance') {
+    // Use aggregation to support sorting and pagination
+    const pipeline = [];
+    if (Object.keys(filters).length > 0) {
+      pipeline.push({ $match: filters });
+    }
+
+    pipeline.push({ $sort: sortOption });
+    pipeline.push({ $skip: from });
+    pipeline.push({ $limit: limit });
+
+    const items = await collection.aggregate(pipeline).toArray();
+    return items;
+  } else {
+    // Normal find
+    const cursor = collection.find(filters).sort(sortOption).skip(from).limit(limit);
+    return await cursor.toArray();
+  }
 }
