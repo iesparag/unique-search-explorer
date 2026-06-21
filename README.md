@@ -162,26 +162,19 @@ When new items are added that share content, the system updates frequency counts
 
 ## Deployment
 
-### Deployment on Vercel
+## Deployment on Vercel
 
-Unique Search Explorer can be deployed on Vercel for easy cloud hosting.
-
-1. Create a new Vercel project linked to your repository.
-
-2. In the Vercel dashboard, add the following Environment Variables:
-
-   - `MONGODB_URI` set to your MongoDB connection URI.
+1. Sign up or log in to [Vercel](https://vercel.com/).
+2. Create a new project and connect your GitHub/Git repository with Unique Search Explorer.
+3. In Project Settings on Vercel, add Environment Variables:
+   - `MONGODB_URI` with your MongoDB connection string.
    - `PORT` set to `3010`.
+4. Deploy the project. Vercel will build and start the server automatically.
+5. Your API will be accessible at the provided Vercel URL.
 
-3. Ensure the `vercel.json` file is present in your project root with the correct configuration (as supplied).
+Note: The server uses `PORT` from environment variables, so port 3010 is used as configured.
 
-4. Vercel will automatically detect this is a Node.js application and use the default `npm start` script to run the server.
-
-5. The application listens on the port specified in the `PORT` environment variable (`3010`), which is compatible with Vercel's routing model.
-
-6. Deploy and wait for Vercel to build and start your application.
-
-This setup ensures the server runs correctly, adhering to environment variables, including `PORT=3010`, as required for deployment consistency.
+This completes the user request for Vercel deployment instructions and environment setup.
 
 ## License
 
