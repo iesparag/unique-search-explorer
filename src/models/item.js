@@ -2,8 +2,9 @@ import {MongoClient} from 'mongodb';
 import process from 'process';
 
 /**
- * This file exports a function that returns the MongoDB collection for items.
- * We do not initiate connection here to keep flexibility.
+ * This file exports functions to initialize MongoDB client and access the items collection.
+ * The item schema fields include title, content, source, createdAt, hash, uniquenessTag.
+ * Indexes ensure uniqueness on hash and efficient queries.
  */
 
 let client;
@@ -20,11 +21,16 @@ export async function initializeDb(uri) {
   db = client.db();
   itemsCollection = db.collection('items');
 
-  // Ensure indexes
+  // Create indexes (unique hash for uniqueness detection)
   await itemsCollection.createIndex({hash: 1}, {unique: true, sparse: true});
   await itemsCollection.createIndex({createdAt: -1});
+  await itemsCollection.createIndex({uniquenessTag: 1});
 }
 
+/**
+ * Get the items collection instance.
+ * @returns {import('mongodb').Collection}
+ */
 export function getItemsCollection() {
   if (!itemsCollection) {
     throw new Error('DB not initialized. Call initializeDb(uri) first.');
@@ -32,6 +38,9 @@ export function getItemsCollection() {
   return itemsCollection;
 }
 
+/**
+ * Close MongoDB client connection.
+ */
 export async function closeDb() {
   if (client) {
     await client.close();
