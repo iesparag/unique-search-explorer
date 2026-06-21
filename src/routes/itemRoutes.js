@@ -1,6 +1,7 @@
 import express from 'express';
 import {addOrUpdateItem, searchItems} from '../services/uniquenessService.js';
 import {getItemsCollection} from '../models/item.js';
+import {hashContent} from '../utils/hash.js';
 
 const router = express.Router();
 
@@ -29,13 +30,26 @@ router.post('/', async (req, res) => {
       ...(source ? { source: source.trim() } : {})
     };
 
+    const collection = getItemsCollection();
+    
+    // Compute hash
+    const hash = hashContent(itemData.content);
+
+    // Find existing items with this hash
+    const existingItems = await collection.find({ hash }).toArray();
+    if (existingItems.length > 0) {
+      // Duplicate content hash exists. Respond with 409.
+      return res.status(409).json({ error: 'Duplicate item detected by hash' });
+    }
+
     const savedItem = await addOrUpdateItem(itemData);
     res.status(201).json(savedItem);
   } catch (err) {
+    console.error(err);
     if (err.code === 11000) {
+      // Duplicate key error (hash unique index)
       return res.status(409).json({ error: 'Duplicate item detected by hash' });
     }
-    console.error(err);
     res.status(500).json({ error: 'Internal server error' });
   }
 });
@@ -120,56 +134,57 @@ router.get('/stats', async (req, res) => {
   try {
     const collection = getItemsCollection();
 
-    // Aggregate by hash to determine frequencies
+    // Aggregate counts by uniquenessTag
     const aggregationPipeline = [
       {
         $group: {
-          _id: '$hash',
+          _id: '$uniquenessTag',
           count: { $sum: 1 },
-          frequency: { $max: '$frequency' },
-          createdAt: { $min: '$createdAt' }
-        }
-      },
-      {
-        $group: {
-          _id: null,
-          totalHashes: { $sum: 1 },
-          uniqueHashes: { $sum: { $cond: [{ $eq: ['$frequency', 1] }, 1, 0] } },
-          rareHashes: { $sum: { $cond: [{ $and: [{ $gte: ['$frequency', 2] }, { $lte: ['$frequency', 5] }] }, 1, 0] } },
-          commonHashes: { $sum: { $cond: [{ $gt: ['$frequency', 5] }, 1, 0] } },
-          frequencyGroups: { $push: '$frequency' }
         }
       }
     ];
 
     const aggregationResult = await collection.aggregate(aggregationPipeline).toArray();
 
-    if (aggregationResult.length === 0) {
-      return res.json({
-        totalItems: 0,
-        UNIQUE: 0,
-        RARE: 0,
-        COMMON: 0,
-        frequencyDistribution: {}
-      });
+    let countMap = { UNIQUE: 0, RARE: 0, COMMON: 0 };
+    let totalItems = 0;
+
+    if (aggregationResult.length > 0) {
+      for (const entry of aggregationResult) {
+        if (entry._id && countMap.hasOwnProperty(entry._id)) {
+          countMap[entry._id] = entry.count;
+          totalItems += entry.count;
+        } else {
+          totalItems += entry.count;
+        }
+      }
+    } else {
+      totalItems = await collection.countDocuments();
     }
 
-    const data = aggregationResult[0];
+    // Build frequency distribution
+    const freqAgg = await collection.aggregate([
+      {
+        $group: {
+          _id: '$frequency',
+          count: { $sum: 1 }
+        }
+      }
+    ]).toArray();
 
-    // frequencyGroups is an array of frequencies per unique hash
-    // Build frequency distribution: count of hashes by frequency
-    const frequencyCountMap = {};
-    for (const freq of data.frequencyGroups) {
-      const key = String(freq);
-      frequencyCountMap[key] = (frequencyCountMap[key] || 0) + 1;
+    const frequencyDistribution = {};
+    for (const freqEntry of freqAgg) {
+      // Treat null/undefined frequency as 0
+      const key = freqEntry._id != null ? String(freqEntry._id) : '0';
+      frequencyDistribution[key] = freqEntry.count;
     }
 
     res.json({
-      totalItems: data.totalHashes,
-      UNIQUE: data.uniqueHashes,
-      RARE: data.rareHashes,
-      COMMON: data.commonHashes,
-      frequencyDistribution: frequencyCountMap
+      totalItems,
+      UNIQUE: countMap.UNIQUE,
+      RARE: countMap.RARE,
+      COMMON: countMap.COMMON,
+      frequencyDistribution
     });
   } catch (err) {
     console.error(err);
