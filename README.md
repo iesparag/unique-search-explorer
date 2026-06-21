@@ -61,8 +61,7 @@ tests/         # Automated tests
 | Variable    | Description                           | Example                              |
 |-------------|-------------------------------------|------------------------------------|
 | MONGODB_URI | MongoDB connection URI               | mongodb://localhost:27017/unique_search_explorer |
-| PORT        | Port for Express.js server           | 3000 (Default), use 3010 in production |
-
+| PORT        | Port for Express.js server           | 3010 (Updated default port)        |
 
 ## Usage Examples
 
@@ -161,11 +160,26 @@ When new items are added that share content, the system updates frequency counts
 - **Tests failing:** Verify MongoDB is reachable and environment variables are correct.
 - **CLI errors:** Ensure you use correct argument formats: key=value pairs or positional content argument.
 
-## Deployment on Vercel
+## Deployment
 
-- The `.env` file as specified should be used for local development and can be replicated using [Vercel Environment Variables](https://vercel.com/docs/environment-variables) in Vercel dashboard.
-- Vercel deployment will pick up the `PORT` environment variable; however, Vercel dynamically assigns ports. The included server code uses `process.env.PORT` which matches best practice for Vercel.
-- Vercel supports Node.js 20+ and Express apps; this project is compatible as-is.
+### Deployment on Vercel
+
+Unique Search Explorer can be deployed on Vercel for easy cloud hosting.
+
+1. Create a new Vercel project linked to your repository.
+
+2. In the Vercel dashboard, add the following Environment Variables:
+
+   - `MONGODB_URI` set to your MongoDB connection URI.
+   - `PORT` set to `3010`.
+
+3. Vercel will automatically detect this is a Node.js application and use the default `npm start` script to run the server.
+
+4. The application listens on the port specified in the `PORT` environment variable (`3010`), which is compatible with Vercel's routing model.
+
+5. Deploy and wait for Vercel to build and start your application.
+
+This setup ensures the server runs correctly, adhering to environment variables, including `PORT=3010`, as required for deployment consistency.
 
 ## License
 
