@@ -11,7 +11,12 @@
     "frontend:build": "vite build",
     "frontend:preview": "vite preview"
   },
-  "keywords": ["unique", "search", "mongodb", "express"],
+  "keywords": [
+    "unique",
+    "search",
+    "mongodb",
+    "express"
+  ],
   "author": "",
   "license": "MIT",
   "dependencies": {
@@ -22,6 +27,7 @@
     "react-dom": "^18.2.0"
   },
   "devDependencies": {
+    "@vitejs/plugin-react": "^4.7.0",
     "vite": "^4.3.9"
   }
 }
