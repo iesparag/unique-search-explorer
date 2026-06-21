@@ -28,8 +28,8 @@ async function startServer() {
 
 async function main() {
   const args = process.argv.slice(2);
-  // If there are CLI commands (add, search), run CLI, else run the server
-  if (args.length > 0 && ['add', 'search'].includes(args[0])) {
+  // CLI supports: add-item and search-items
+  if (args.length > 0 && ['add-item', 'search-items'].includes(args[0])) {
     try {
       await initializeDb(config.mongodbUri);
       await cli();
