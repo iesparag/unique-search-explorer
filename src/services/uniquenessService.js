@@ -2,8 +2,29 @@ import {getItemsCollection} from '../models/item.js';
 import {hashContent} from '../utils/hash.js';
 
 /**
+ * Tags based on frequency counts
+ */
+const Tags = {
+  UNIQUE: 'UNIQUE',
+  RARE: 'RARE',
+  COMMON: 'COMMON',
+};
+
+/**
+ * Determine uniqueness tag by frequency count
+ * @param {number} frequency
+ * @returns {string} tag
+ */
+function getUniquenessTag(frequency) {
+  if (frequency === 1) return Tags.UNIQUE;
+  if (frequency <= 5) return Tags.RARE;
+  return Tags.COMMON;
+}
+
+/**
  * Adds an item to the database, computes hash to find uniqueness.
  * If an item with the same hash exists, increments its frequency.
+ * Updates uniquenessTag for all items with the hash accordingly.
  * Returns the saved or updated item.
  *
  * @param {Object} itemData - item fields (at least content/property to hash)
@@ -13,30 +34,60 @@ export async function addOrUpdateItem(itemData) {
   if (!itemData || typeof itemData !== 'object') {
     throw new TypeError('itemData must be an object');
   }
+
+  if (typeof itemData.content !== 'string' || !itemData.content.trim()) {
+    throw new Error('Field "content" is required and must be a non-empty string.');
+  }
+
   const collection = getItemsCollection();
 
   // Compute a hash from the item content (assuming 'content' field)
-  const hash = hashContent(itemData.content || '');
+  const contentTrimmed = itemData.content.trim();
+  const hash = hashContent(contentTrimmed);
 
   const now = new Date();
 
-  // Try to find existing item with same hash
+  // Check if there is any item with the same hash
   const existing = await collection.findOne({hash});
+
   if (existing) {
-    // Update frequency count and lastSeen
-    const updateResult = await collection.findOneAndUpdate(
+    // There is already an item with the same hash
+    // We will increment frequency for all such items
+    // and update lastSeen
+    await collection.updateMany(
       {hash},
-      { $inc: {frequency: 1}, $set: {lastSeen: now} },
-      { returnDocument: 'after' }
+      { $inc: { frequency: 1 }, $set: { lastSeen: now } }
     );
-    return updateResult.value;
+
+    // Now get updated frequency (all items share frequency, so get one)
+    const updatedItem = await collection.findOne({hash});
+    const tag = getUniquenessTag(updatedItem.frequency);
+
+    // Update uniquenessTag for all items with this hash
+    await collection.updateMany(
+      {hash},
+      { $set: { uniquenessTag: tag } }
+    );
+
+    // Return updated frequency and tag
+    return {
+      ...itemData,
+      hash,
+      frequency: updatedItem.frequency, // after increment
+      uniquenessTag: tag,
+      createdAt: existing.createdAt,
+      lastSeen: now,
+    };
   }
 
-  // Create new item with frequency 1
+  // No existing item with same hash: create new one with frequency 1 and tag UNIQUE
+  const tag = getUniquenessTag(1);
   const newItem = {
     ...itemData,
+    content: contentTrimmed,
     hash,
     frequency: 1,
+    uniquenessTag: tag,
     createdAt: now,
     lastSeen: now
   };
@@ -68,6 +119,7 @@ export async function searchItems({query = '', onlyUnique = false, limit = 20} =
   }
 
   if (onlyUnique) {
+    // only frequency 1 needed, uniquenessTag UNIQUE maybe or frequency 1 is simpler
     filters.frequency = 1;
   }
 
