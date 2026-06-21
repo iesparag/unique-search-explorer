@@ -83,14 +83,33 @@ router.get('/', async (req, res) => {
     if (sort === 'createdAt') {
       sortOption = { createdAt: -1 };
     } else if (sort === 'relevance') {
+      // Sort first by frequency ascending, then createdAt descending
       sortOption = { frequency: 1, createdAt: -1 };
     }
 
     const collection = getItemsCollection();
-    const cursor = collection.find(filters).sort(sortOption).skip(from).limit(limit);
-    const items = await cursor.toArray();
 
-    res.json({ items, page, limit });
+    // For relevance sorting and filtering by uniquenessTag, use aggregation to support paging correctly
+    if (sort === 'relevance') {
+      const pipeline = [];
+
+      if (Object.keys(filters).length > 0) {
+        pipeline.push({ $match: filters });
+      }
+
+      pipeline.push({ $sort: sortOption });
+      pipeline.push({ $skip: from });
+      pipeline.push({ $limit: limit });
+
+      const items = await collection.aggregate(pipeline).toArray();
+
+      return res.json({ items, page, limit });
+    } else {
+      // Normal find for createdAt sorting
+      const cursor = collection.find(filters).sort(sortOption).skip(from).limit(limit);
+      const items = await cursor.toArray();
+      return res.json({ items, page, limit });
+    }
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Internal server error' });
@@ -102,13 +121,15 @@ router.get('/stats', async (req, res) => {
   try {
     const collection = getItemsCollection();
 
-    // Group by hash, count how many items per hash, and get frequency from any item
+    // Aggregate by hash to get item counts per frequency
+    // Correct the aggregation to return counts of items per frequency correctly
     const aggregationPipeline = [
       {
         $group: {
           _id: '$hash',
           frequency: { $max: '$frequency' },
-          count: { $sum: 1 }
+          count: { $sum: 1 },
+          createdAt: { $min: '$createdAt' }
         }
       },
       {
@@ -118,7 +139,8 @@ router.get('/stats', async (req, res) => {
           uniqueItems: { $sum: { $cond: [{ $eq: ['$frequency', 1] }, '$count', 0] } },
           rareItems: { $sum: { $cond: [{ $and: [{ $gt: ['$frequency', 1] }, { $lte: ['$frequency', 5] }] }, '$count', 0] } },
           commonItems: { $sum: { $cond: [{ $gt: ['$frequency', 5] }, '$count', 0] } },
-          frequencies: { $push: '$frequency' }
+          frequencies: { $push: '$frequency' },
+          frequencyGroups: { $push: { frequency: '$frequency', count: '$count' } }
         }
       }
     ];
@@ -137,10 +159,12 @@ router.get('/stats', async (req, res) => {
 
     const data = aggregationResult[0];
 
-    // Build frequency distribution: how many hash groups with each frequency
+    // Build frequency distribution: count of groups per frequency
+    // Use frequencyGroups to build accurate distribution
     const frequencyCountMap = {};
-    for (const freq of data.frequencies) {
-      frequencyCountMap[freq] = (frequencyCountMap[freq] || 0) + 1;
+    for (const fg of data.frequencyGroups) {
+      const key = String(fg.frequency);
+      frequencyCountMap[key] = (frequencyCountMap[key] || 0) + 1;
     }
 
     res.json({
