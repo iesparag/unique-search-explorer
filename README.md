@@ -7,11 +7,13 @@ Unique Search Explorer is a Node.js application designed to find unique, rare, o
 - Detect and tag items for uniqueness.
 - Perform smooth and flexible search queries for unique items.
 - Both API and CLI interfaces for ingestion and searching.
+- Minimal React frontend SPA served from the same Express server.
 
 ## Technology Stack
 - Node.js 20+
 - Express.js
 - MongoDB
+- React (frontend)
 - dotenv for environment configuration
 - Node's built-in test runner
 
@@ -23,6 +25,7 @@ src/
   services/    # Business logic and uniqueness computations
   routes/      # Express API routes and CLI commands
   utils/       # Helpers like hashing
+  frontend/    # React frontend application source and build output
 tests/         # Automated tests
 ```
 
@@ -34,7 +37,7 @@ tests/         # Automated tests
    cd unique-search-explorer
    ```
 
-2. Create a `.env` file in the project root with the following production settings for deployment (for example on Vercel):
+2. Create a `.env` file in the project root with the following production settings for deployment (example):
 
    ```dotenv
    MONGODB_URI=mongodb+srv://iesparagjain:iesparagjain@cluster0.boltvzz.mongodb.net/
@@ -46,24 +49,36 @@ tests/         # Automated tests
    npm install
    ```
 
-4. Start the API server:
+4. Build the frontend React application:
+
+   ```bash
+   npm run frontend:build
+   ```
+
+5. Start the API and frontend server:
+
    ```bash
    npm start
    ```
 
-5. Run tests once (all tests must pass):
-   ```bash
-   npm test
-   ```
+6. Visit `http://localhost:3010/` in your browser to use the frontend SPA.
 
 ## Environment Variables
 
 | Variable    | Description                           | Example                              |
 |-------------|-------------------------------------|------------------------------------|
 | MONGODB_URI | MongoDB connection URI               | mongodb://localhost:27017/unique_search_explorer |
-| PORT        | Port for Express.js server           | 3010 (Updated default port)        |
+| PORT        | Port for Express.js server           | 3010 (default port)                |
 
 ## Usage Examples
+
+### Frontend Usage
+
+- The frontend SPA is served on the root path `/` of the same server as the API.
+- Access the UI by navigating to `http://localhost:3010/` (or configured port).
+- Use the search bar to query items.
+- Add new unique items via the form.
+- The frontend communicates with the API at `/items` endpoints transparently.
 
 ### REST API
 
@@ -128,11 +143,11 @@ The CLI tool provides commands to add and search items.
   node src/index.js search-items --query "unique" --onlyUnique --limit 10 --page 1
   ```
 
-  Arguments:
-  - `--query <text>` : Text to search in content
-  - `--onlyUnique` : Return only items tagged UNIQUE
-  - `--limit <number>` : Number of results per page (default 20)
-  - `--page <number>` : Page number to display (default 1)
+Arguments:
+- `--query <text>` : Text to search in content
+- `--onlyUnique` : Return only items tagged UNIQUE
+- `--limit <number>` : Number of results per page (default 20)
+- `--page <number>` : Page number to display (default 1)
 
 ### Help
 
@@ -162,7 +177,7 @@ When new items are added that share content, the system updates frequency counts
 
 ## Deployment
 
-## Deployment on Vercel
+### Deployment on Vercel
 
 1. Sign up or log in to [Vercel](https://vercel.com/).
 2. Create a new project and connect your GitHub/Git repository with Unique Search Explorer.
@@ -170,11 +185,9 @@ When new items are added that share content, the system updates frequency counts
    - `MONGODB_URI` with your MongoDB connection string.
    - `PORT` set to `3010`.
 4. Deploy the project. Vercel will build and start the server automatically.
-5. Your API will be accessible at the provided Vercel URL.
+5. Your API and frontend will be accessible at the provided Vercel URL.
 
 Note: The server uses `PORT` from environment variables, so port 3010 is used as configured.
-
-This completes the user request for Vercel deployment instructions and environment setup.
 
 ## License
 
